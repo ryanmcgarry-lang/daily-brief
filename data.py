@@ -19,14 +19,28 @@ _START_DATE = (date(date.today().year, 1, 1) - timedelta(days=10)).strftime("%Y-
 # ── Per-ticker fetcher ─────────────────────────────────────────────────────────
 
 def _fetch_close_yahoo(yf_ticker: str) -> Optional[pd.Series]:
-    """Close price series via yfinance."""
+    """Close price series via yfinance.
+    If historical daily bars are stale (Yahoo Finance data lag for Asian markets),
+    supplements with fast_info.last_price so today's session is reflected.
+    """
     try:
-        hist = yf.Ticker(yf_ticker).history(start=_START_DATE, auto_adjust=True)
+        ticker = yf.Ticker(yf_ticker)
+        hist   = ticker.history(start=_START_DATE, auto_adjust=True)
         if hist.empty:
             return None
         s = hist["Close"].dropna()
         if s.index.tz is not None:
             s.index = s.index.tz_convert("UTC").tz_localize(None)
+
+        today = pd.Timestamp(date.today())
+        if s.index[-1].normalize() < today:
+            try:
+                last_price = getattr(ticker.fast_info, "last_price", None)
+                if last_price and float(last_price) > 0:
+                    s = pd.concat([s, pd.Series([float(last_price)], index=[today])])
+            except Exception:
+                pass
+
         return s
     except Exception as e:
         log.debug(f"Yahoo fetch failed — {yf_ticker}: {e}")
