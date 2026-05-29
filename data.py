@@ -21,7 +21,8 @@ _START_DATE = (date(date.today().year, 1, 1) - timedelta(days=10)).strftime("%Y-
 def _fetch_close_yahoo(yf_ticker: str) -> Optional[pd.Series]:
     """Close price series via yfinance.
     If historical daily bars are stale (Yahoo Finance data lag for Asian markets),
-    supplements with fast_info.last_price so today's session is reflected.
+    supplements with today's price via fast_info or a fresh short-period fetch
+    so today's session return is always reflected.
     """
     try:
         ticker = yf.Ticker(yf_ticker)
@@ -34,12 +35,36 @@ def _fetch_close_yahoo(yf_ticker: str) -> Optional[pd.Series]:
 
         today = pd.Timestamp(date.today())
         if s.index[-1].normalize() < today:
+            updated = False
+
+            # Attempt 1 — fast_info current price
             try:
                 last_price = getattr(ticker.fast_info, "last_price", None)
                 if last_price and float(last_price) > 0:
                     s = pd.concat([s, pd.Series([float(last_price)], index=[today])])
-            except Exception:
-                pass
+                    updated = True
+                    log.info(f"  fast_info used for {yf_ticker}: {last_price:.2f}")
+            except Exception as e:
+                log.warning(f"  fast_info failed for {yf_ticker}: {e}")
+
+            # Attempt 2 — fresh 5-day fetch (different Yahoo endpoint, often more current)
+            if not updated:
+                try:
+                    recent = yf.Ticker(yf_ticker).history(period="5d", auto_adjust=True)
+                    if not recent.empty:
+                        rs = recent["Close"].dropna()
+                        if rs.index.tz is not None:
+                            rs.index = rs.index.tz_convert("UTC").tz_localize(None)
+                        if not rs.empty and rs.index[-1].normalize() >= today:
+                            s = pd.concat([s, rs.iloc[[-1]]])
+                            s = s[~s.index.duplicated(keep="last")]
+                            updated = True
+                            log.info(f"  period=5d used for {yf_ticker}")
+                except Exception as e:
+                    log.warning(f"  period=5d fallback failed for {yf_ticker}: {e}")
+
+            if not updated:
+                log.warning(f"  stale data for {yf_ticker} — both fallbacks failed")
 
         return s
     except Exception as e:
