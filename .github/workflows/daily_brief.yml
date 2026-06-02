@@ -2,8 +2,8 @@ name: APAC Daily Brief
 
 on:
   schedule:
-    # 08:30 UTC weekdays — 30 min after Hong Kong (last APAC market) closes at 08:00 UTC
-    - cron: "30 8 * * 1-5"
+    # 11:00 UTC weekdays — ~3 h after Tokyo/Seoul close, gives Yahoo Finance time to update daily bars
+    - cron: "0 11 * * 1-5"
   workflow_dispatch:   # allows manual trigger from GitHub UI
 
 jobs:

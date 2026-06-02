@@ -26,8 +26,9 @@ _IMPACT_TIERS = [
     (10, ["boj decision", "pboc decision", "rba decision", "bok decision",
           "bank of japan", "monetary policy statement",
           "quantitative easing", "yield curve control", "ycc"]),
-    (8,  ["gdp", "consumer price index", "cpi", "pmi reading",
-          "industrial production", "trade balance",
+    (8,  ["gdp", "consumer price index", "cpi", "pmi", "pmi reading",
+          "caixin pmi", "nbs pmi", "manufacturing pmi", "services pmi",
+          "industrial production", "trade balance", "inflation data",
           "unemployment rate", "jobs report", "payrolls"]),
     (7,  ["tariff", "trade war", "trade deal", "sanctions", "export ban",
           "tech ban", "chip ban", "semiconductor restriction", "import duties"]),
@@ -42,7 +43,7 @@ _IMPACT_TIERS = [
     (4,  ["central bank", "monetary policy", "interest rate", "rate path",
           "rate outlook", "hawkish", "dovish",
           "valuation", "overvalued", "undervalued", "bubble"]),
-    (3,  ["inflation", "growth outlook", "pmi", "gdp growth",
+    (3,  ["inflation", "growth outlook", "gdp growth",
           "stock market", "equity market", "bond market", "capital markets",
           "index performance", "market performance", "market rally", "market selloff",
           "ipo", "listing", "fundraising", "fund raise"]),
@@ -129,7 +130,7 @@ def _score(art: dict) -> float:
 
 # ── Public function ────────────────────────────────────────────────────────────
 
-def fetch_apac_news(max_per_feed: int = 20, max_total: int = 10) -> list[dict]:
+def fetch_apac_news(max_per_feed: int = 20, max_total: int = 12) -> list[dict]:
     """
     Pull RSS feeds, filter for APAC relevance, rank by market-impact score.
     Returns up to max_total articles, highest impact first.

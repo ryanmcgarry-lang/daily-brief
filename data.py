@@ -38,12 +38,18 @@ def _fetch_close_yahoo(yf_ticker: str) -> Optional[pd.Series]:
             updated = False
 
             # Attempt 1 — fast_info current price
+            # Only use if it differs from the last historical bar; if equal,
+            # fast_info is still stale (Yahoo hasn't refreshed post-close yet).
             try:
                 last_price = getattr(ticker.fast_info, "last_price", None)
                 if last_price and float(last_price) > 0:
-                    s = pd.concat([s, pd.Series([float(last_price)], index=[today])])
-                    updated = True
-                    log.info(f"  fast_info used for {yf_ticker}: {last_price:.2f}")
+                    lp = float(last_price)
+                    if lp != float(s.iloc[-1]):
+                        s = pd.concat([s, pd.Series([lp], index=[today])])
+                        updated = True
+                        log.info(f"  fast_info used for {yf_ticker}: {lp:.2f}")
+                    else:
+                        log.warning(f"  fast_info stale for {yf_ticker}: {lp:.2f} == last hist bar")
             except Exception as e:
                 log.warning(f"  fast_info failed for {yf_ticker}: {e}")
 
