@@ -137,14 +137,18 @@ def fetch_apac_news(max_per_feed: int = 20, max_total: int = 12) -> list[dict]:
     """
     articles: list[dict] = []
     seen: set[str] = set()
+    n_total = n_apac = n_context = n_impact = 0
 
     for feed_meta in NEWS_FEEDS:
         try:
             parsed = feedparser.parse(feed_meta["url"])
-            for entry in parsed.entries[:max_per_feed]:
+            feed_entries = parsed.entries[:max_per_feed]
+            log.info(f"  [{feed_meta['name']}] {len(feed_entries)} entries fetched")
+            for entry in feed_entries:
                 title = entry.get("title", "").strip()
                 if not title or title in seen:
                     continue
+                n_total += 1
 
                 summary = _strip_html(
                     entry.get("summary", entry.get("description", ""))
@@ -153,10 +157,16 @@ def fetch_apac_news(max_per_feed: int = 20, max_total: int = 12) -> list[dict]:
                 combined = (title + " " + summary).lower()
                 if not any(kw in combined for kw in APAC_KEYWORDS):
                     continue
+                n_apac += 1
                 if not any(kw in combined for kw in _MARKET_CONTEXT_KEYWORDS):
+                    log.debug(f"  DROPPED (no market context): {title}")
                     continue
-                if _impact_score(combined) == 0:
+                n_context += 1
+                score = _impact_score(combined)
+                if score == 0:
+                    log.debug(f"  DROPPED (zero impact): {title}")
                     continue
+                n_impact += 1
 
                 published: Optional[datetime] = None
                 tp = entry.get("published_parsed")
@@ -178,6 +188,10 @@ def fetch_apac_news(max_per_feed: int = 20, max_total: int = 12) -> list[dict]:
         except Exception as e:
             log.warning(f"Feed unavailable — {feed_meta['name']}: {e}")
 
+    log.info(
+        f"  APAC news filter: {n_total} unique → {n_apac} APAC → "
+        f"{n_context} market-context → {n_impact} scored → {min(n_impact, max_total)} shown"
+    )
     articles.sort(key=_score, reverse=True)
     return articles[:max_total]
 
